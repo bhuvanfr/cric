@@ -1,4 +1,7 @@
 package com.bhuvan.cricket;
 
-public interface InningsRepository {
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface InningsRepository extends JpaRepository<Innings, Long> {
+
 }

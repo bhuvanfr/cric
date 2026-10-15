@@ -7,6 +7,86 @@ import jakarta.persistence.*;
 
 
 public class Delivery {
+    public Innings getInnings() {
+        return innings;
+    }
+
+    public void setInnings(Innings innings) {
+        this.innings = innings;
+    }
+
+    public int getOverNumber() {
+        return overNumber;
+    }
+
+    public void setOverNumber(int overNumber) {
+        this.overNumber = overNumber;
+    }
+
+    public int getBallNumber() {
+        return ballNumber;
+    }
+
+    public void setBallNumber(int ballNumber) {
+        this.ballNumber = ballNumber;
+    }
+
+    public int getBatterRuns() {
+        return batterRuns;
+    }
+
+    public void setBatterRuns(int batterRuns) {
+        this.batterRuns = batterRuns;
+    }
+
+    public int getExtras() {
+        return extras;
+    }
+
+    public void setExtras(int extras) {
+        this.extras = extras;
+    }
+
+    public Player getBatter() {
+        return batter;
+    }
+
+    public void setBatter(Player batter) {
+        this.batter = batter;
+    }
+
+    public Player getBowler() {
+        return bowler;
+    }
+
+    public void setBowler(Player bowler) {
+        this.bowler = bowler;
+    }
+
+    public Player getPlayerOut() {
+        return playerOut;
+    }
+
+    public void setPlayerOut(Player playerOut) {
+        this.playerOut = playerOut;
+    }
+
+    public String getExtrasType() {
+        return extrasType;
+    }
+
+    public void setExtrasType(String extrasType) {
+        this.extrasType = extrasType;
+    }
+
+    public String getWicketKind() {
+        return wicketKind;
+    }
+
+    public void setWicketKind(String wicketKind) {
+        this.wicketKind = wicketKind;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

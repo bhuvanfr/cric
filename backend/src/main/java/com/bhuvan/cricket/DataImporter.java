@@ -7,6 +7,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class DataImporter implements CommandLineRunner {
@@ -15,22 +19,32 @@ public class DataImporter implements CommandLineRunner {
     private String dataDir;
 
     private final MatchRepository matchRepository;
+    private final PlayerRepository playerRepository;
+    private final InningsRepository inningsRepository;
+    private final DeliveryRepository deliveryRepository;
 
-    public DataImporter(MatchRepository matchRepository) {
+    public DataImporter(MatchRepository matchRepository,
+                        PlayerRepository playerRepository,
+                        InningsRepository inningsRepository,
+                        DeliveryRepository deliveryRepository) {
         this.matchRepository = matchRepository;
+        this.playerRepository = playerRepository;
+        this.inningsRepository = inningsRepository;
+        this.deliveryRepository = deliveryRepository;
     }
 
     @Override
     public void run(String... args) throws Exception {
-        String sourceId = "335982";   // the file you've been using, without .json
+        String sourceId = "829807";
 
         if (matchRepository.existsBySourceId(sourceId)) {
             System.out.println("Already imported: " + sourceId);
             return;
         }
 
-        File file = new File(dataDir, sourceId + ".json");
-        JsonNode info = new ObjectMapper().readTree(file).path("info");
+        JsonNode root = new ObjectMapper().readTree(new File(dataDir, sourceId + ".json"));
+        JsonNode info = root.path("info");
+        JsonNode registry = info.path("registry").path("people");
 
         Match match = new Match();
         match.setSourceId(sourceId);
@@ -40,8 +54,75 @@ public class DataImporter implements CommandLineRunner {
         match.setTeam1(info.path("teams").get(0).asText());
         match.setTeam2(info.path("teams").get(1).asText());
         match.setWinner(info.path("outcome").path("winner").asText(null));
-
         matchRepository.save(match);
-        System.out.println("Imported: " + sourceId);
+
+        Map<String, Player> cache = new HashMap<>();
+        for (int t = 0; t < 2; t++) {
+            String team = info.path("teams").get(t).asText();
+            for (JsonNode nameNode : info.path("players").path(team)) {
+                getPlayer(nameNode.asText(), registry, cache);
+            }
+        }
+
+        int number = 1;
+        int deliveryCount = 0;
+        for (JsonNode inn : root.path("innings")) {
+            String batting = inn.path("team").asText();
+            Innings innings = new Innings();
+            innings.setMatch(match);
+            innings.setInningsNumber(number++);
+            innings.setBattingTeam(batting);
+            innings.setBowlingTeam(batting.equals(match.getTeam1()) ? match.getTeam2() : match.getTeam1());
+            inningsRepository.save(innings);
+
+            List<Delivery> batch = new ArrayList<>();
+            for (JsonNode over : inn.path("overs")) {
+                int overNumber = over.path("over").asInt();
+                int ball = 0;
+                for (JsonNode d : over.path("deliveries")) {
+                    ball++;
+                    Delivery delivery = new Delivery();
+                    delivery.setInnings(innings);
+                    delivery.setOverNumber(overNumber);
+                    delivery.setBallNumber(ball);
+                    delivery.setBatter(getPlayer(d.path("batter").asText(), registry, cache));
+                    delivery.setBowler(getPlayer(d.path("bowler").asText(), registry, cache));
+                    delivery.setBatterRuns(d.path("runs").path("batter").asInt());
+                    delivery.setExtras(d.path("runs").path("extras").asInt());
+
+                    JsonNode extras = d.path("extras");
+                    if (!extras.isMissingNode()) {
+                        List<String> types = new ArrayList<>();
+                        extras.propertyNames().forEach(types::add);
+                        delivery.setExtrasType(String.join(",", types));
+                    }
+
+                    JsonNode wickets = d.path("wickets");
+                    if (wickets.size() > 0) {
+                        JsonNode w = wickets.get(0);
+                        delivery.setWicketKind(w.path("kind").asText());
+                        delivery.setPlayerOut(getPlayer(w.path("player_out").asText(), registry, cache));
+                    }
+                    batch.add(delivery);
+                }
+            }
+            deliveryRepository.saveAll(batch);
+            deliveryCount += batch.size();
+        }
+        System.out.println("Imported " + sourceId + " with " + deliveryCount + " deliveries");
+    }
+
+    private Player getPlayer(String name, JsonNode registry, Map<String, Player> cache) {
+        Player cached = cache.get(name);
+        if (cached != null) return cached;
+        String id = registry.path(name).asText();
+        Player player = playerRepository.findById(id).orElseGet(() -> {
+            Player p = new Player();
+            p.setId(id);
+            p.setName(name);
+            return playerRepository.save(p);
+        });
+        cache.put(name, player);
+        return player;
     }
 }

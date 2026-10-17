@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +35,31 @@ public class DataImporter implements CommandLineRunner {
     }
 
     @Override
-    public void run(String... args) throws Exception {
-        String sourceId = "829807";
-
-        if (matchRepository.existsBySourceId(sourceId)) {
-            System.out.println("Already imported: " + sourceId);
+    public void run(String... args) {
+        File[] files = new File(dataDir).listFiles((dir, name) -> name.endsWith(".json"));
+        if (files == null) {
+            System.out.println("No files found in " + dataDir);
             return;
+        }
+        Arrays.sort(files);
+        int done = 0;
+        for (File f : files) {
+            String sourceId = f.getName().replace(".json", "");
+            try {
+                if (importMatch(sourceId)) {
+                    done++;
+                    if (done % 50 == 0) System.out.println("Imported " + done + " matches so far");
+                }
+            } catch (Exception e) {
+                System.out.println("FAILED " + sourceId + ": " + e.getMessage());
+            }
+        }
+        System.out.println("Finished. Newly imported: " + done);
+    }
+
+    private boolean importMatch(String sourceId) throws Exception {
+        if (matchRepository.existsBySourceId(sourceId)) {
+            return false;
         }
 
         JsonNode root = new ObjectMapper().readTree(new File(dataDir, sourceId + ".json"));
@@ -65,7 +85,6 @@ public class DataImporter implements CommandLineRunner {
         }
 
         int number = 1;
-        int deliveryCount = 0;
         for (JsonNode inn : root.path("innings")) {
             String batting = inn.path("team").asText();
             Innings innings = new Innings();
@@ -107,9 +126,8 @@ public class DataImporter implements CommandLineRunner {
                 }
             }
             deliveryRepository.saveAll(batch);
-            deliveryCount += batch.size();
         }
-        System.out.println("Imported " + sourceId + " with " + deliveryCount + " deliveries");
+        return true;
     }
 
     private Player getPlayer(String name, JsonNode registry, Map<String, Player> cache) {

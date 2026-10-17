@@ -16,6 +16,15 @@ public class Match {
     private String team2;
     private String winner;
     private String sourceId;
+    private Integer seasonYear;
+
+    public Integer getSeasonYear() {
+        return seasonYear;
+    }
+
+    public void setSeasonYear(Integer seasonYear) {
+        this.seasonYear = seasonYear;
+    }
 
     public String getSourceId() {
         return sourceId;
